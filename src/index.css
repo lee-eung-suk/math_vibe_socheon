@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-black text-white antialiased selection:bg-white/20;
+    background-image: url('https://imgur.com/lVF1sXf');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply backdrop-blur-xl bg-white/10 border border-white/20;
+  }
+  
+  .glass-dark {
+    @apply backdrop-blur-xl bg-black/40 border border-white/10;
+  }
+
+  .keep-all {
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+}
