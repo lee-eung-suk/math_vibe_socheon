@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
     <!-- 테일윈드 CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --apple-blur: blur(6px);
@@ -121,6 +123,46 @@
         html {
             scroll-behavior: smooth;
         }
+
+        /* 관리자 버튼 */
+        .admin-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 11px;
+            color: rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            z-index: 1000;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(4px);
+            transition: all 0.3s;
+            border: 1px solid rgba(0,0,0,0.05);
+            user-select: none;
+        }
+
+        .admin-btn:hover {
+            color: rgba(0, 0, 0, 0.6);
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* 삭제 버튼 */
+        .delete-btn {
+            color: #ff3b30;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: rgba(255, 59, 48, 0.1);
+            transition: background 0.3s;
+        }
+
+        .delete-btn:hover {
+            background: rgba(255, 59, 48, 0.2);
+        }
     </style>
 </head>
 <body>
@@ -189,11 +231,21 @@
     </section>
 
     <!-- 푸터 -->
-    <footer class="py-20 text-center text-gray-400 text-sm font-medium">
-        <p>© 2026 소천초등학교 바이브코딩 전시회. 모든 권리 보유.</p>
+    <footer class="py-32 text-center text-gray-400 text-sm font-bold tracking-widest">
+        <p>© 2026 소천초등학교 수학 바이브코딩 전시회. 모든 권리 보유.</p>
     </footer>
 
+    <!-- 관리자 버튼 -->
+    <div class="admin-btn" onclick="adminLogin()">관리자</div>
+
     <script>
+        // 1. Supabase 설정 및 연결
+        const SUPABASE_URL = 'https://uihdvkezxlilaieaygte.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpaGR2a2V6eGxpbGFpZWF5Z3RlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNDQyNDcsImV4cCI6MjA5MTYyMDI0N30.sMYU39Bi4YEQYC0KWE3qt5Az3KzbdouhcFfcvI52hJQ';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let isAdmin = false;
+
         // 학생 데이터
         const students = [
             { grade: 6, name: "이한솔" },
@@ -212,73 +264,137 @@
         const galleryGrid = document.getElementById('gallery-grid');
         students.forEach((student, index) => {
             const card = document.createElement('div');
-            card.className = 'apple-card p-8 flex flex-col items-center text-center fade-in';
+            card.className = 'apple-card p-10 flex flex-col items-center text-center fade-in';
             card.style.animationDelay = `${index * 0.05}s`;
             card.innerHTML = `
-                <div class="w-16 h-16 bg-indigo-100/50 rounded-2xl flex items-center justify-center mb-6">
-                    <span class="text-2xl font-bold text-indigo-600">${student.grade}</span>
+                <div class="w-20 h-20 bg-indigo-100/50 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
+                    <span class="text-3xl font-black text-indigo-600">${student.grade}</span>
                 </div>
-                <div class="mb-2 text-sm font-black text-indigo-500 uppercase tracking-widest">${student.grade}학년</div>
-                <h3 class="text-2xl font-black mb-8 text-gray-900">${student.name}</h3>
+                <div class="mb-3 text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">${student.grade}학년</div>
+                <h3 class="text-3xl font-black mb-10 text-gray-900 tracking-tighter">${student.name}</h3>
                 <a href="#" target="_blank" class="pill-button text-sm w-full">게임 즐기기</a>
             `;
             galleryGrid.appendChild(card);
         });
 
-        // 방명록 로직
-        const guestbookList = document.getElementById('guestbook-list');
-        let messages = JSON.parse(localStorage.getItem('socheon_messages')) || [
-            { name: "선생님", content: "모두들 정말 고생 많았어요! 수학이 이렇게 즐거울 수 있다니 놀랍네요.", date: "2026.04.12" },
-            { name: "학부모", content: "우리 아이들의 창의력에 박수를 보냅니다. 최고예요!", date: "2026.04.12" }
-        ];
+        // 2. 방명록 로직 (Table: guestbook)
+        async function fetchMessages() {
+            const { data, error } = await supabaseClient
+                .from('guestbook')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-        function renderMessages() {
-            guestbookList.innerHTML = '';
-            messages.forEach((msg, index) => {
+            if (error) {
+                console.error('데이터를 가져오는 중 오류 발생:', error);
+                return;
+            }
+            renderMessages(data);
+        }
+
+        // 방명록 렌더링
+        function renderMessages(messages) {
+            const list = document.getElementById('guestbook-list');
+            list.innerHTML = '';
+            
+            if (!messages || messages.length === 0) {
+                list.innerHTML = '<div class="text-center py-10 text-gray-400 font-medium">첫 번째 응원 메시지를 남겨보세요!</div>';
+                return;
+            }
+
+            messages.forEach((msg) => {
                 const item = document.createElement('div');
-                item.className = 'glass-panel p-6 fade-in';
+                item.className = 'glass-panel p-8 fade-in shadow-lg flex justify-between items-start';
                 item.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="font-bold text-gray-900">${msg.name}</span>
-                        <span class="text-xs text-gray-400 font-medium">${msg.date}</span>
+                    <div class="flex-1">
+                        <div class="flex items-center gap-3 mb-3">
+                            <span class="font-black text-gray-900 text-lg">${msg.name}</span>
+                            <span class="text-xs text-gray-400 font-bold">${new Date(msg.created_at).toLocaleDateString()}</span>
+                            ${isAdmin ? `<span class="delete-btn" onclick="deleteMessage(${msg.id})">삭제</span>` : ''}
+                        </div>
+                        <p class="text-gray-600 font-medium text-lg leading-relaxed keep-all">${msg.content}</p>
                     </div>
-                    <p class="text-gray-600 font-medium" style="word-break: break-all;">${msg.content}</p>
                 `;
-                guestbookList.appendChild(item);
+                list.appendChild(item);
             });
         }
 
-        function addMessage() {
-            const nameInput = document.getElementById('guest-name');
-            const contentInput = document.getElementById('guest-content');
+        // 등록하기
+        async function addMessage() {
+            const name = document.getElementById('guest-name').value.trim();
+            const content = document.getElementById('guest-content').value.trim();
             
-            if (!nameInput.value.trim() || !contentInput.value.trim()) {
+            if (!name || !content) {
                 alert('이름과 내용을 모두 입력해주세요!');
                 return;
             }
 
-            const now = new Date();
-            const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
+            const { error } = await supabaseClient
+                .from('guestbook')
+                .insert([{ name, content, created_at: new Date().toISOString() }]);
 
-            const newMessage = {
-                name: nameInput.value,
-                content: contentInput.value,
-                date: dateStr
-            };
-
-            messages.unshift(newMessage);
-            localStorage.setItem('socheon_messages', JSON.stringify(messages));
-            
-            nameInput.value = '';
-            contentInput.value = '';
-            
-            renderMessages();
+            if (error) {
+                alert('등록 중 오류가 발생했습니다.');
+                console.error(error);
+            } else {
+                document.getElementById('guest-name').value = '';
+                document.getElementById('guest-content').value = '';
+                fetchMessages();
+            }
         }
 
-        // 초기 렌더링
-        renderMessages();
+        // 3. 관리자 모드 구현
+        function adminLogin() {
+            if (isAdmin) {
+                if (confirm("관리자 모드를 해제하시겠습니까?")) {
+                    isAdmin = false;
+                    const btn = document.querySelector('.admin-btn');
+                    btn.innerText = "관리자";
+                    btn.style.color = "rgba(0,0,0,0.3)";
+                    btn.style.background = "rgba(255, 255, 255, 0.2)";
+                    fetchMessages();
+                }
+                return;
+            }
 
-        // 부드러운 스크롤 이벤트 (네비게이션)
+            const id = prompt("관리자 아이디를 입력하세요.");
+            if (id === null) return;
+            const pw = prompt("관리자 비밀번호를 입력하세요.");
+            if (pw === null) return;
+
+            if (id === 'sc6727414' && pw === 'sc6727414') {
+                isAdmin = true;
+                const btn = document.querySelector('.admin-btn');
+                btn.innerText = "관리자 (로그아웃)";
+                btn.style.color = "#4f46e5";
+                btn.style.background = "rgba(99, 102, 241, 0.1)";
+                alert("관리자 모드로 전환되었습니다.");
+                fetchMessages();
+            } else {
+                alert("아이디 또는 비밀번호가 일치하지 않습니다.");
+            }
+        }
+
+        // 삭제 기능
+        async function deleteMessage(id) {
+            if (!confirm("정말 이 메시지를 삭제하시겠습니까?")) return;
+
+            const { error } = await supabaseClient
+                .from('guestbook')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
+                alert('삭제 중 오류가 발생했습니다.');
+                console.error(error);
+            } else {
+                fetchMessages();
+            }
+        }
+
+        // 초기 실행
+        fetchMessages();
+
+        // 부드러운 스크롤 이벤트
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
