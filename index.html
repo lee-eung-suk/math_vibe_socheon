@@ -324,10 +324,14 @@
                 return;
             }
 
-            // created_at은 DB에서 자동 생성되도록 제외하거나 명시적으로 전송
+            // created_at 값을 명시적으로 전송하여 Not-Null 제약 조건 오류 해결
             const { error } = await supabaseClient
                 .from('guestbook')
-                .insert([{ name, content }]);
+                .insert([{ 
+                    name, 
+                    content, 
+                    created_at: new Date().toISOString() 
+                }]);
 
             if (error) {
                 alert(`등록 중 오류가 발생했습니다: ${error.message}`);
