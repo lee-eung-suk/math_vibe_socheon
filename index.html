@@ -185,7 +185,7 @@
     <header class="pt-40 pb-20 px-6 text-center">
         <div class="max-w-4xl mx-auto">
             <h1 class="text-5xl md:text-7xl font-black tracking-tighter mb-8 fade-in" style="word-break: keep-all; text-shadow: 0 2px 10px rgba(255,255,255,0.8);">
-                수학이 팡팡! <br><span style="color: var(--primary-color)">소천 코딩 놀이터</span>
+                생각을 코딩하다: <br><span style="color: var(--primary-color)">AI로 수학 게임 만들기</span>
             </h1>
             <div class="glass-panel p-8 md:p-10 fade-in" style="animation-delay: 0.2s;">
                 <p class="text-lg md:text-xl text-gray-600 leading-relaxed font-medium" style="word-break: keep-all;">
@@ -248,16 +248,12 @@
 
         // 학생 데이터
         const students = [
-            { grade: 6, name: "이한솔" },
-            { grade: 6, name: "주은혜" },
-            { grade: 4, name: "주사랑" },
-            { grade: 4, name: "송설" },
-            { grade: 3, name: "정하온" },
-            { grade: 3, name: "이승하" },
-            { grade: 3, name: "이지훈" },
-            { grade: 3, name: "이지호" },
-            { grade: 2, name: "남하늘" },
-            { grade: 2, name: "정라온" }
+            { grade: 3, name: "정하온", link: "https://whimsical-beignet-5166a0.netlify.app/" },
+            { grade: 3, name: "이승하", link: "https://exquisite-cendol-f49f4a.netlify.app/" },
+            { grade: 3, name: "이지훈", link: "https://earnest-syrniki-eb43a3.netlify.app/" },
+            { grade: 3, name: "이지호", link: "https://effortless-beijinho-c83792.netlify.app/" },
+            { grade: 2, name: "남하늘", link: "https://jocular-brigadeiros-ae812c.netlify.app/" },
+            { grade: 2, name: "정라온", link: "https://shiny-crostata-646197.netlify.app/" }
         ];
 
         // 갤러리 렌더링
@@ -272,7 +268,7 @@
                 </div>
                 <div class="mb-3 text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">${student.grade}학년</div>
                 <h3 class="text-3xl font-black mb-10 text-gray-900 tracking-tighter">${student.name}</h3>
-                <a href="#" target="_blank" class="pill-button text-sm w-full">게임 즐기기</a>
+                <a href="${student.link}" target="_blank" class="pill-button text-sm w-full">게임 즐기기</a>
             `;
             galleryGrid.appendChild(card);
         });
@@ -328,13 +324,14 @@
                 return;
             }
 
+            // created_at은 DB에서 자동 생성되도록 제외하거나 명시적으로 전송
             const { error } = await supabaseClient
                 .from('guestbook')
-                .insert([{ name, content, created_at: new Date().toISOString() }]);
+                .insert([{ name, content }]);
 
             if (error) {
-                alert('등록 중 오류가 발생했습니다.');
-                console.error(error);
+                alert(`등록 중 오류가 발생했습니다: ${error.message}`);
+                console.error('Supabase Insert Error:', error);
             } else {
                 document.getElementById('guest-name').value = '';
                 document.getElementById('guest-content').value = '';
@@ -376,6 +373,10 @@
 
         // 삭제 기능
         async function deleteMessage(id) {
+            if (!id) {
+                alert("삭제할 메시지의 ID가 없습니다. DB에 'id' 컬럼이 있는지 확인해주세요.");
+                return;
+            }
             if (!confirm("정말 이 메시지를 삭제하시겠습니까?")) return;
 
             const { error } = await supabaseClient
@@ -384,8 +385,8 @@
                 .eq('id', id);
 
             if (error) {
-                alert('삭제 중 오류가 발생했습니다.');
-                console.error(error);
+                alert(`삭제 중 오류가 발생했습니다: ${error.message}`);
+                console.error('Supabase Delete Error:', error);
             } else {
                 fetchMessages();
             }
