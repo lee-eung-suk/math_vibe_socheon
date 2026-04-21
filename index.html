@@ -248,12 +248,21 @@
 
         // 학생 데이터
         const students = [
-            { grade: 3, name: "정하온", link: "https://whimsical-beignet-5166a0.netlify.app/" },
-            { grade: 3, name: "이승하", link: "https://exquisite-cendol-f49f4a.netlify.app/" },
-            { grade: 3, name: "이지훈", link: "https://earnest-syrniki-eb43a3.netlify.app/" },
-            { grade: 3, name: "이지호", link: "https://effortless-beijinho-c83792.netlify.app/" },
-            { grade: 2, name: "남하늘", link: "https://jocular-brigadeiros-ae812c.netlify.app/" },
-            { grade: 2, name: "정라온", link: "https://shiny-crostata-646197.netlify.app/" }
+            { grade: 6, name: "주은혜", links: [{ title: "게임 즐기기", url: "https://benevolent-begonia-bc9c59.netlify.app/" }] },
+            { grade: 4, name: "송설", links: [{ title: "게임 즐기기", url: "https://resplendent-hamster-cc9519.netlify.app/" }] },
+            { grade: 4, name: "주사랑", links: [{ title: "게임 즐기기", url: "https://wonderful-llama-88e59e.netlify.app/" }] },
+            { grade: 3, name: "정하온", links: [{ title: "게임 즐기기", url: "https://whimsical-beignet-5166a0.netlify.app/" }] },
+            { grade: 3, name: "이승하", links: [{ title: "게임 즐기기", url: "https://exquisite-cendol-f49f4a.netlify.app/" }] },
+            { grade: 3, name: "이지훈", links: [{ title: "게임 즐기기", url: "https://earnest-syrniki-eb43a3.netlify.app/" }] },
+            { grade: 3, name: "이지호", links: [{ title: "게임 즐기기", url: "https://effortless-beijinho-c83792.netlify.app/" }] },
+            { grade: 2, name: "남하늘", links: [
+                { title: "작품 1 즐기기", url: "https://jocular-brigadeiros-ae812c.netlify.app/" },
+                { title: "작품 2 즐기기", url: "https://tranquil-monstera-b62765.netlify.app/" }
+            ] },
+            { grade: 2, name: "정라온", links: [
+                { title: "작품 1 즐기기", url: "https://shiny-crostata-646197.netlify.app/" },
+                { title: "작품 2 즐기기", url: "https://dapper-belekoy-d2569a.netlify.app/" }
+            ] }
         ];
 
         // 갤러리 렌더링
@@ -262,13 +271,21 @@
             const card = document.createElement('div');
             card.className = 'apple-card p-10 flex flex-col items-center text-center fade-in';
             card.style.animationDelay = `${index * 0.05}s`;
+            
+            let linksHtml = '';
+            student.links.forEach((link) => {
+                linksHtml += `<a href="${link.url}" target="_blank" class="pill-button text-sm w-full">${link.title}</a>`;
+            });
+
             card.innerHTML = `
                 <div class="w-20 h-20 bg-indigo-100/50 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
                     <span class="text-3xl font-black text-indigo-600">${student.grade}</span>
                 </div>
                 <div class="mb-3 text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">${student.grade}학년</div>
                 <h3 class="text-3xl font-black mb-10 text-gray-900 tracking-tighter">${student.name}</h3>
-                <a href="${student.link}" target="_blank" class="pill-button text-sm w-full">게임 즐기기</a>
+                <div class="w-full flex flex-col gap-3 mt-auto">
+                    ${linksHtml}
+                </div>
             `;
             galleryGrid.appendChild(card);
         });
