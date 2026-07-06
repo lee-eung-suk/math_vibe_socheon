@@ -174,9 +174,10 @@
             <div class="text-lg font-black tracking-tighter text-gray-900">
                 소천초등학교 <span style="color: var(--primary-color)">바이브코딩</span>
             </div>
-            <div class="flex gap-8 text-sm font-bold text-gray-700">
+            <div class="flex gap-8 text-sm font-bold text-gray-700 items-center">
                 <a href="#gallery" class="hover:text-indigo-600 transition-colors">작품 보기</a>
                 <a href="#guestbook" class="hover:text-indigo-600 transition-colors">방명록</a>
+                <a href="#" onclick="openAdminModal()" class="hover:text-indigo-600 transition-colors flex items-center gap-1 bg-gray-100/80 px-3 py-1.5 rounded-full text-xs ml-2"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> 관리자</a>
             </div>
         </div>
     </nav>
@@ -351,7 +352,7 @@
         });
 
         // 평가 이벤트 델리게이션
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', async (e) => {
             // 탭 클릭
             if (e.target.closest('.eval-tab-btn')) {
                 const btn = e.target.closest('.eval-tab-btn');
@@ -405,23 +406,57 @@
                 }
                 
                 const output = {
-                    targetStudent: studentName,
-                    evaluationType: state.type,
-                    scores: state.scores,
-                    timestamp: new Date().toISOString()
+                    target_student: studentName,
+                    evaluation_type: state.type,
+                    score_math: state.scores.math,
+                    score_creative: state.scores.creative,
+                    score_effort: state.scores.effort,
+                    created_at: new Date().toISOString()
                 };
                 
-                console.log("=== 평가 데이터 제출 ===");
-                console.log(JSON.stringify(output, null, 2));
-                alert(studentName + " 학생에 대한 " + state.type + "가 완료되었습니다! (F12를 눌러 콘솔을 확인하세요)");
-                
-                // 제출 후 별점 초기화
-                state.scores = { math: 0, creative: 0, effort: 0 };
-                const cardPanel = btn.closest('.apple-card');
-                cardPanel.querySelectorAll('.eval-star-btn').forEach(b => {
-                    b.classList.remove('text-yellow-400');
-                    b.classList.add('text-gray-300');
-                });
+                const originalText = btn.innerText;
+                btn.innerText = "제출 중...";
+                btn.disabled = true;
+
+                try {
+                    // 1. 로컬 스토리지에 데이터 누적 저장 (관리자 대시보드용)
+                    const localData = JSON.parse(localStorage.getItem('evaluations_v1') || '[]');
+                    localData.push({
+                        id: Date.now(),
+                        studentName: studentName,
+                        type: state.type,
+                        mathScore: state.scores.math,
+                        creativityScore: state.scores.creative,
+                        effortScore: state.scores.effort,
+                        date: new Date().toISOString()
+                    });
+                    localStorage.setItem('evaluations_v1', JSON.stringify(localData));
+
+                    // 2. Supabase 저장 시도 (선택적)
+                    const { error } = await supabaseClient
+                        .from('evaluations')
+                        .insert([output]);
+
+                    if (error) {
+                        console.warn("Supabase 저장 실패 (로컬에는 정상 저장됨):", error.message);
+                    }
+
+                    alert(studentName + " 학생에 대한 " + state.type + "가 완료되었습니다!");
+                    
+                    // 제출 후 별점 초기화
+                    state.scores = { math: 0, creative: 0, effort: 0 };
+                    const cardPanel = btn.closest('.apple-card');
+                    cardPanel.querySelectorAll('.eval-star-btn').forEach(b => {
+                        b.classList.remove('text-yellow-400');
+                        b.classList.add('text-gray-300');
+                    });
+                } catch (err) {
+                    alert("평가 제출 중 오류가 발생했습니다. DB 설정을 확인해주세요: " + err.message);
+                    console.error('Supabase Evaluation Insert Error:', err);
+                } finally {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
             }
         });
 
@@ -564,6 +599,165 @@
                 }
             });
         });
+    </script>
+
+    <!-- 관리자 인증 모달 -->
+    <div id="admin-login-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl transform transition-all">
+            <h3 class="text-2xl font-black text-gray-900 mb-6 text-center">관리자 인증</h3>
+            <input type="password" id="admin-pwd-input" placeholder="비밀번호 입력" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-6 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-center tracking-widest text-lg" onkeypress="if(event.key === 'Enter') verifyAdmin()">
+            <div class="flex gap-3">
+                <button onclick="closeAdminModal()" class="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition-colors">취소</button>
+                <button onclick="verifyAdmin()" class="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 대시보드 모달 (전체 화면) -->
+    <div id="admin-dashboard-modal" class="fixed inset-0 bg-gray-50 z-[100] hidden flex flex-col overflow-hidden">
+        <!-- 헤더 -->
+        <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm z-10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                    <span class="text-xl">📊</span>
+                </div>
+                <h2 class="text-xl md:text-2xl font-black text-gray-900 tracking-tight">과정중심평가 대시보드</h2>
+            </div>
+            <button onclick="closeAdminDashboard()" class="px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900 font-bold rounded-lg transition-colors text-sm">닫기 ✕</button>
+        </div>
+        
+        <!-- 콘텐츠 영역 -->
+        <div class="p-4 md:p-8 flex-1 overflow-auto">
+            <div class="max-w-6xl mx-auto space-y-6">
+                
+                <!-- 컨트롤 패널 -->
+                <div class="flex flex-col md:flex-row gap-4 justify-between bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                    <div class="flex flex-col md:flex-row gap-4 flex-1">
+                        <div class="relative w-full max-w-xs">
+                            <input type="text" id="eval-search-input" onkeyup="renderEvalTable()" placeholder="학생 이름 검색..." class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                            <svg class="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                        <select id="eval-type-filter" onchange="renderEvalTable()" class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-gray-700">
+                            <option value="all">전체 평가 구분 보기</option>
+                            <option value="동료평가">동료평가만 보기</option>
+                            <option value="자기평가">자기평가만 보기</option>
+                        </select>
+                    </div>
+                    <button onclick="resetEvalData()" class="py-2.5 px-5 bg-red-50 text-red-600 border border-red-100 font-bold rounded-xl hover:bg-red-100 transition-colors text-sm flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        데이터 초기화
+                    </button>
+                </div>
+                
+                <!-- 테이블 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[800px]">
+                            <thead>
+                                <tr class="bg-gray-50/50 border-b border-gray-100 text-xs font-black text-gray-500 uppercase tracking-wider">
+                                    <th class="p-4 pl-6 whitespace-nowrap">평가 일시</th>
+                                    <th class="p-4 whitespace-nowrap">작품 학생 이름</th>
+                                    <th class="p-4 whitespace-nowrap">구분</th>
+                                    <th class="p-4 text-center whitespace-nowrap">수학적 활용</th>
+                                    <th class="p-4 text-center whitespace-nowrap">창의적 아이디어</th>
+                                    <th class="p-4 text-center whitespace-nowrap">문제해결 노력</th>
+                                    <th class="p-4 text-center whitespace-nowrap pr-6">평균 점수</th>
+                                </tr>
+                            </thead>
+                            <tbody id="eval-table-body" class="divide-y divide-gray-100 text-sm">
+                                <!-- 데이터 렌더링 영역 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 관리자 모달 및 대시보드 로직
+        function openAdminModal() {
+            document.getElementById('admin-login-modal').classList.remove('hidden');
+            const pwdInput = document.getElementById('admin-pwd-input');
+            pwdInput.value = '';
+            setTimeout(() => pwdInput.focus(), 100);
+        }
+
+        function closeAdminModal() {
+            document.getElementById('admin-login-modal').classList.add('hidden');
+        }
+
+        function verifyAdmin() {
+            const pwd = document.getElementById('admin-pwd-input').value;
+            if (pwd === 'sc7414') {
+                closeAdminModal();
+                openAdminDashboard();
+            } else {
+                alert("비밀번호가 올바르지 않습니다.");
+                document.getElementById('admin-pwd-input').focus();
+            }
+        }
+
+        function openAdminDashboard() {
+            document.getElementById('admin-dashboard-modal').classList.remove('hidden');
+            renderEvalTable();
+        }
+
+        function closeAdminDashboard() {
+            document.getElementById('admin-dashboard-modal').classList.add('hidden');
+        }
+
+        function renderEvalTable() {
+            const tbody = document.getElementById('eval-table-body');
+            const searchKeyword = document.getElementById('eval-search-input').value.toLowerCase().trim();
+            const filterType = document.getElementById('eval-type-filter').value;
+            
+            const localData = JSON.parse(localStorage.getItem('evaluations_v1') || '[]');
+            
+            let filteredData = localData.filter(item => {
+                const matchName = item.studentName.toLowerCase().includes(searchKeyword);
+                const matchType = filterType === 'all' || item.type === filterType;
+                return matchName && matchType;
+            });
+
+            // 내림차순 정렬 (최신순)
+            filteredData.sort((a, b) => b.id - a.id);
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-12 text-center text-gray-400 font-medium">저장된 평가 데이터가 없습니다.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(item => {
+                const avg = ((item.mathScore + item.creativityScore + item.effortScore) / 3).toFixed(1);
+                const dateObj = new Date(item.date);
+                const dateStr = dateObj.toLocaleDateString('ko-KR', { month:'short', day:'numeric' }) + ' ' + 
+                                dateObj.toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12: false });
+                
+                const typeStyle = item.type === '동료평가' 
+                    ? 'bg-blue-50 text-blue-600 border border-blue-100' 
+                    : 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+
+                return `
+                    <tr class="hover:bg-gray-50/80 transition-colors group">
+                        <td class="p-4 pl-6 text-gray-400 font-medium text-xs">${dateStr}</td>
+                        <td class="p-4 font-black text-gray-800">${item.studentName}</td>
+                        <td class="p-4"><span class="px-2.5 py-1 ${typeStyle} rounded-md text-[11px] font-bold tracking-tight">${item.type}</span></td>
+                        <td class="p-4 text-center font-bold text-gray-700 group-hover:text-amber-500 transition-colors">⭐ ${item.mathScore}</td>
+                        <td class="p-4 text-center font-bold text-gray-700 group-hover:text-amber-500 transition-colors">⭐ ${item.creativityScore}</td>
+                        <td class="p-4 text-center font-bold text-gray-700 group-hover:text-amber-500 transition-colors">⭐ ${item.effortScore}</td>
+                        <td class="p-4 pr-6 text-center font-black text-indigo-600 text-base">${avg}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function resetEvalData() {
+            if (confirm("정말로 모든 평가 데이터를 초기화하시겠습니까?\n(로컬 브라우저에 저장된 데이터가 모두 삭제되며, 이 작업은 되돌릴 수 없습니다.)")) {
+                localStorage.removeItem('evaluations_v1');
+                renderEvalTable();
+            }
+        }
     </script>
 </body>
 </html>
