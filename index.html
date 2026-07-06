@@ -266,11 +266,23 @@
             ] }
         ];
 
+        // 과정중심평가 상태 관리
+        window.evaluationData = {};
+        function getEvalState(studentName) {
+            if (!window.evaluationData[studentName]) {
+                window.evaluationData[studentName] = {
+                    type: '동료평가',
+                    scores: { math: 0, creative: 0, effort: 0 }
+                };
+            }
+            return window.evaluationData[studentName];
+        }
+
         // 갤러리 렌더링
         const galleryGrid = document.getElementById('gallery-grid');
         students.forEach((student, index) => {
             const card = document.createElement('div');
-            card.className = 'apple-card p-10 flex flex-col items-center text-center fade-in';
+            card.className = 'apple-card p-8 flex flex-col items-center text-center fade-in group relative';
             card.style.animationDelay = `${index * 0.05}s`;
             
             let linksHtml = '';
@@ -278,17 +290,139 @@
                 linksHtml += `<a href="${link.url}" target="_blank" class="pill-button text-sm w-full">${link.title}</a>`;
             });
 
-            card.innerHTML = `
-                <div class="w-20 h-20 bg-indigo-100/50 rounded-3xl flex items-center justify-center mb-8 shadow-inner">
-                    <span class="text-3xl font-black text-indigo-600">${student.grade}</span>
+            const evalCriteria = [
+                { id: 'math', label: '수학적 활용', tooltip: '수학 원리를 게임 규칙에 잘 적용했나요?' },
+                { id: 'creative', label: '창의적 아이디어', tooltip: '게임의 방식이나 디자인이 참신한가요?' },
+                { id: 'effort', label: '문제해결 노력', tooltip: '어려움을 극복하고 끝까지 완성도 있게 만들었나요?' }
+            ];
+
+            let criteriaHtml = evalCriteria.map(c => `
+                <div class="flex items-center justify-between">
+                    <div class="group/tooltip relative flex items-center cursor-help">
+                        <span class="text-xs font-semibold text-gray-700 border-b border-dashed border-gray-400 pb-0.5">${c.label}</span>
+                        <div class="absolute bottom-full left-0 mb-2 w-48 p-2.5 bg-gray-800 text-white text-[11px] leading-relaxed rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-30 pointer-events-none text-left">
+                            ${c.tooltip}
+                            <div class="absolute top-full left-4 w-2 h-2 bg-gray-800 rotate-45 -mt-1"></div>
+                        </div>
+                    </div>
+                    <div class="flex gap-1 eval-stars" data-student="${student.name}" data-criterion="${c.id}">
+                        ${[1,2,3,4,5].map(star => `
+                            <button type="button" class="eval-star-btn text-gray-300 hover:text-yellow-400 transition-colors focus:outline-none" data-value="${star}">
+                                <svg class="w-5 h-5 pointer-events-none" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                            </button>
+                        `).join('')}
+                    </div>
                 </div>
-                <div class="mb-3 text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">${student.grade}학년</div>
-                <h3 class="text-3xl font-black mb-10 text-gray-900 tracking-tighter">${student.name}</h3>
-                <div class="w-full flex flex-col gap-3 mt-auto">
-                    ${linksHtml}
+            `).join('');
+
+            card.innerHTML = `
+                <div class="w-full flex flex-col items-center transition-transform duration-300 group-hover:-translate-y-2">
+                    <div class="w-16 h-16 bg-indigo-100/50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+                        <span class="text-2xl font-black text-indigo-600">${student.grade}</span>
+                    </div>
+                    <div class="mb-2 text-xs font-black text-indigo-500 uppercase tracking-[0.2em]">${student.grade}학년</div>
+                    <h3 class="text-2xl font-black mb-6 text-gray-900 tracking-tighter">${student.name}</h3>
+                    <div class="w-full flex flex-col gap-2 mt-auto relative z-20">
+                        ${linksHtml}
+                    </div>
+                </div>
+
+                <!-- 평가 패널 (Hover Expand) -->
+                <div class="w-full overflow-hidden max-h-0 opacity-0 group-hover:max-h-[500px] group-hover:opacity-100 group-hover:mt-6 transition-all duration-500 ease-in-out flex flex-col pointer-events-none group-hover:pointer-events-auto">
+                    <div class="bg-gray-50/90 rounded-2xl p-4 border border-gray-100 shadow-inner w-full text-left">
+                        <!-- 탭 메뉴 -->
+                        <div class="flex bg-gray-200 p-1 rounded-lg mb-4 w-full" data-student="${student.name}">
+                            <button type="button" class="eval-tab-btn flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm transition-all" data-type="동료평가">동료평가</button>
+                            <button type="button" class="eval-tab-btn flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition-all" data-type="자기평가">자기평가</button>
+                        </div>
+                        
+                        <!-- 별점 항목 -->
+                        <div class="flex flex-col gap-3 mb-5">
+                            ${criteriaHtml}
+                        </div>
+                        
+                        <button type="button" class="eval-submit-btn w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors shadow-md" data-student="${student.name}">
+                            평가 제출하기
+                        </button>
+                    </div>
                 </div>
             `;
             galleryGrid.appendChild(card);
+        });
+
+        // 평가 이벤트 델리게이션
+        document.addEventListener('click', (e) => {
+            // 탭 클릭
+            if (e.target.closest('.eval-tab-btn')) {
+                const btn = e.target.closest('.eval-tab-btn');
+                const studentName = btn.closest('.flex').dataset.student;
+                const type = btn.dataset.type;
+                const state = getEvalState(studentName);
+                state.type = type;
+                
+                const container = btn.parentElement;
+                container.querySelectorAll('.eval-tab-btn').forEach(b => {
+                    if (b.dataset.type === type) {
+                        b.className = 'eval-tab-btn flex-1 py-1.5 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm transition-all';
+                    } else {
+                        b.className = 'eval-tab-btn flex-1 py-1.5 text-xs font-bold rounded-md text-gray-500 hover:text-gray-700 transition-all';
+                    }
+                });
+            }
+            
+            // 별점 클릭
+            if (e.target.closest('.eval-star-btn')) {
+                const btn = e.target.closest('.eval-star-btn');
+                const value = parseInt(btn.dataset.value);
+                const starsContainer = btn.closest('.eval-stars');
+                const studentName = starsContainer.dataset.student;
+                const criterion = starsContainer.dataset.criterion;
+                
+                const state = getEvalState(studentName);
+                state.scores[criterion] = value;
+                
+                starsContainer.querySelectorAll('.eval-star-btn').forEach(b => {
+                    const bVal = parseInt(b.dataset.value);
+                    if (bVal <= value) {
+                        b.classList.remove('text-gray-300');
+                        b.classList.add('text-yellow-400');
+                    } else {
+                        b.classList.remove('text-yellow-400');
+                        b.classList.add('text-gray-300');
+                    }
+                });
+            }
+            
+            // 제출 클릭
+            if (e.target.closest('.eval-submit-btn')) {
+                const btn = e.target.closest('.eval-submit-btn');
+                const studentName = btn.dataset.student;
+                const state = getEvalState(studentName);
+                
+                if (state.scores.math === 0 || state.scores.creative === 0 || state.scores.effort === 0) {
+                    alert("모든 평가 항목에 별점을 입력해주세요.");
+                    return;
+                }
+                
+                const output = {
+                    targetStudent: studentName,
+                    evaluationType: state.type,
+                    scores: state.scores,
+                    timestamp: new Date().toISOString()
+                };
+                
+                console.log("=== 평가 데이터 제출 ===");
+                console.log(JSON.stringify(output, null, 2));
+                alert(studentName + " 학생에 대한 " + state.type + "가 완료되었습니다! (F12를 눌러 콘솔을 확인하세요)");
+                
+                // 제출 후 별점 초기화
+                state.scores = { math: 0, creative: 0, effort: 0 };
+                const cardPanel = btn.closest('.apple-card');
+                cardPanel.querySelectorAll('.eval-star-btn').forEach(b => {
+                    b.classList.remove('text-yellow-400');
+                    b.classList.add('text-gray-300');
+                });
+            }
         });
 
         // 2. 방명록 로직 (Table: guestbook)
